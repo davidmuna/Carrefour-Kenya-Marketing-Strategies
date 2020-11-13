@@ -1,0 +1,160 @@
+---
+title: "Carrefour Kenya Marketing Strategies Part 4"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Business Understanding
+
+As a Data analyst at Carrefour Kenya, I undertook a Data Science Project to inform the marketing department on the most relevant marketing strategies that will result in the highest no. of sales (total price including tax). My project has been divided into four parts where I'll explore a recent marketing dataset by performing various unsupervised learning techniques and later providing recommendations based on my insights.
+
+## Data Understanding
+
+```{r}
+# Loading the necessary libraries and automatically installing them if not present
+
+pacman :: p_load(rio,tidyverse, Amelia ,anomalize)
+```
+
+```{r}
+# Previewing our dataset
+
+data<-import("~/R/Unsupervised Learning Week 14 IP/Supermarket_Sales_Forecasting - Sales.csv")
+data
+```
+
+
+``` {r}
+# Checking the size and shape of data
+dim(data)
+```
+
+``` {r}
+# Viewing data types using str().
+
+str(data)
+```
+
+## Data Preparation
+``` {r}
+# Checking for missing data in our data
+missmap(data)
+```
+``` {r}
+# Checking for duplicated records
+
+duplicated_rows <- data[duplicated(data),]  
+duplicated_rows # No duplicates in our data
+```
+``` {r}
+# Converting all column names to lowercase and date feature to datetime
+
+# changing case
+names(data)[1:2] <- tolower(names(data)[1:2])
+```
+
+```{r}
+# converting to datetime
+data$date <- as.POSIXct(data$date, "%m-%d-%Y",tz = "GMT")
+```
+
+``` {r}
+# Checking for Outliers in Sales
+
+boxplot(data[,c(2)]) # Summary statistics will tell us if these few points are outliers
+```
+## Exploratory Data Analysis (Univariate & Bivariate )
+
+# Univariate
+
+```{r}
+summary(data)
+
+# Since we want to detect anomalies or fraud in sales data, we'll let these points remain in the data which reveals maximum sale of 1042.65 and minimum of 10.68
+```
+
+```{r}
+# Histogram of sales 
+
+# Distribution of Sales
+hist(data$sales,
+        main = "Distribution of Sales(Benford's Law)",
+        xlab = "Sales",
+        ylab = "Frequency")
+```
+
+```{r}
+# Similar to part 1 of this project, the histogram seems to be somewhat similar to Benford's Law Distribution of anomalous numbers in real life numerical data. However it has some slight differences in the first bar which should be higher than the second one.
+```
+
+# Bivariate
+```{r}
+# First feature extracting the day and month from date and converting day to numeric
+
+data$day <- format(data$date, "%d")
+data$month <- format(data$date, "%m")
+data$day <- as.numeric(data$day)
+
+# Plotting scatter plot of date vs sales
+plot(data[,c(1,2)])   # There seems to be no clear relationship between date and sales
+```
+
+```{r}
+# Plotting scatter plot of month vs sales
+plot(data[,c(4,2)])   # There seems to be no clear relationship between month and sales as well
+```
+
+```{r}
+# Correlations
+
+correlations <- cor(data[,2:3], method = "pearson")
+round(correlations, 2)  # Confirms no relationship between day and sales
+```
+
+## Anomaly Detection
+```{r}
+# Groupind data by month
+monthly_data <- data %>% 
+          group_by(date,month) %>% summarise_at(vars(sales),funs(sum(.,na.rm=TRUE)))
+
+# converting monthly_data to tibble
+monthly_data <- as_tibble(monthly_data)
+
+# Detecting Anomalies in monthly sales
+monthly_data %>%
+    time_decompose(sales) %>%
+    anomalize(remainder) %>%
+    time_recompose() %>%
+    plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.5)
+
+```
+```{r}
+# converting overall data to tibble
+data_tibble <- as_tibble(data)
+
+# Detecting Anomalies in overall sales
+data_tibble %>%
+    time_decompose(sales) %>%
+    anomalize(remainder) %>%
+    time_recompose() %>%
+    plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.5)
+
+```
+```{r}
+# From the two graphs above,it is clear that Carrefour Supermarket has no cases of fraud/anomalies in the sales data. Everything is okay. Cases of anomalies/fraud would have been highlighted by red dots
+
+# Therefore it is true that its distribution of sales observes Benford's Law as seen in Univariate Analysis.
+```
+
+
+## Insights
+
+```{r}
+# Carrefour should continue with its protocols in recording sales data as it is clean and free of fraudulent activities.
+
+# The sales of products is independent of the day or month. However, from part one of this analysis, the sales is dependent on the time of day. See first part of the project.
+
+# We need sales data from each branch to conduct anomaly detection from each branch.
+```

@@ -1,0 +1,206 @@
+---
+title: "Carrefour Kenya Marketing Strategies"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Business Understanding
+
+As a Data analyst at Carrefour Kenya, I undertook a Data Science Project to inform the marketing department on the most relevant marketing strategies that will result in the highest no. of sales (total price including tax). My project has been divided into four parts where I'll explore a recent marketing dataset by performing various unsupervised learning techniques and later providing recommendations based on my insights.
+
+## Data Understanding
+
+```{r}
+# Loading the necessary libraries and automatically installing them if not present
+
+pacman :: p_load(arules,arulesViz)
+```
+
+```{r}
+# Checking our dataset
+
+path <- "http://bit.ly/SupermarketDatasetII"
+data<-read.transactions(path, sep = ",")
+data
+```
+
+``` {r}
+# Verifying the object's class to show us transactions as the type of data that we will need
+class(data)
+```
+
+```{r}
+# Previewing our first 10 transactions
+inspect(data[1:10])
+```
+```{r}
+# We can see our first transaction has a large sized item set
+```
+## Analysis
+```{r}
+# Previewing the first 10 items that make up our dataset,
+
+items <- as.data.frame(itemLabels(data))
+colnames(items) <- "Item"
+head(items, 10)    
+```
+```{r}
+# Generating a summary of the most purchased items, 
+# distribution of the item sets etc.
+
+summary(data)
+```
+``` {r}
+# Majority of transactions (1754 transactions) have and item set size of 1, followed by 2 which had a total of 1358 transactions, and so on.
+```
+
+```{r}
+# Exploring the absolute frequency of some articles/items
+# i.e. transacations ranging from transaction 1 to 15 
+
+itemFrequency(data[, 1:15],type = "absolute")
+```
+
+``` {r}
+# Percentage of the relative frequencies of the items above and rounding them to two decimal places
+round(itemFrequency(data[,1:15],type = "relative")*100,2)
+```
+
+```{r}
+# Producing a chart of frequencies and fitering 
+# to consider only items with a minimum percentage 
+# of support of 0.06
+# Displaying the items whose relative importance is at least 6% ie support of 0.06
+
+# plot the frequency of items
+itemFrequencyPlot(data, support = 0.06,col="darkred")
+```
+
+```{r}
+# Producing a chart of frequencies and fitering 
+# to consider only top 20 items
+
+# plot the frequency of top 20 items
+itemFrequencyPlot(data, topN = 20,col="darkgreen")
+```
+```{r}
+# Building a model based on association rules using the apriori function 
+# and selecting minimum support as 0.001 and a confidence of 0.75
+# We use Min Support as 0.001 and confidence as 0.75
+# ---
+# Using a high level of support can make the model lose interesting rules
+# Using a low confidence level increases the number of rules of which many will not be useful
+# Therefore we strike a balance between the two and arrived at 0.001 support to maintain interesting sets and 0.75 confidence to increase the number of rules slightly and obtain 110 rules
+
+rules <- apriori (data, parameter = list(supp = 0.001, conf = 0.7))
+rules
+```
+
+
+``` {r}
+
+# Getting the size of rules,rule length distribution and more statistical information such as support, lift and confidence 
+# coverage and count
+
+summary(rules)
+```
+```{r}
+# Visualising the first 15 rules. Click on "Show in New Window after running cell to see graph in full view"
+
+plot(rules[1:15],
+
+method = "graph",
+
+control = list(type = "items"))
+```
+```{r}
+# From the above plot we can conclude that:
+
+# All bacon and pancakes are strongly associated by the colour red(more lift) and the size of the node(more support), therefore they must be placed together.
+
+# Most of the transactions were consolidated around mineral water. Carrefour can probably have mineral water strategically placed in most, if not all, isles.
+
+# We can also see that people who buy blueberries are more likely to buy eggs. These should be put in the same isle or shelf
+#Those who buy strong cheese are more likely to buy milk. These should be put in the same isle or shelf
+
+```
+
+```{r}
+# Plotting an interactive plot to visualise first 15 rules and their confidence, support and lift
+
+plotly_arules(rules[1:15])
+```
+```{r}
+# From above plot, {frozen smoothie,spinach} has a high lift of 3.73 and 88.9% confidence of buying mineral water. These products should be placed within close proximity of each other.
+
+# Darker red points indicate higher lift
+```
+
+```{r}
+# Observing first 10 model rules in descending order of confidence level by sorting rules in descending order
+
+rules<-sort(rules, by="confidence", decreasing=TRUE)
+inspect(rules[1:10])
+```
+```{r}
+# First four item sets indicate customers have 100% confidence/chance of buying right hand side items after buying the left hand side items. i.e customers who bought {french fries,mushroom cream sauce,pasta} are 100% likely to buy {escalope}
+
+# Also, if someone buys {mushroom cream sauce,pasta} set, they are 95% likely to buy {escalope} too and so on for the other 9 item sets
+```
+
+```{r}
+# If Carrefour is interested in making a promotion relating to the sale of Whole Milk
+# we create a subset of rules concerning Whole Milk to tell us the items that the customers bought before purchasing Whole Milk
+
+milk <- subset(rules, subset = rhs %pin% "milk")
+ 
+# Then sorting by confidence
+milk <- sort(milk, by="confidence", decreasing=TRUE)
+inspect(milk[1:10])
+```
+```{r}
+# All customers who bought the first set,{cake,meatballs,mineral water}, always bought whole milk afterwards
+```
+
+```{r}
+# If Carrefour wanted to determine items that customers might buy who have previously bought burgers,
+
+# We create a subset of rules concerning burgers to determine what other products the customer might buy
+burgers <- subset(rules, subset = lhs %pin% "burgers")
+
+
+# Order by confidence
+burgers<-sort(burgers, by="confidence", decreasing=TRUE)
+
+burgers
+
+# inspect top 6
+inspect(burgers[1:6])
+```
+
+``` {r}
+# From above, customers who bought set 	{burgers,milk,salmon} had an 88.88% chance of buying spaghetti
+# Those who had previously bought burgers had a >80% chance of buying milk, mineral water or spaghetti
+```
+
+## Insights
+
+
+``` {r}
+# Mineral water is most frequently purchased item followed by eggs, spaghetti, french fries and chocolates.
+# Most people buy 3-5 items per transaction with majority being 4 items per transaction as per the rule length distribution
+# As per EDA, the highest number on transactions, 1754, were from people who bought a single item
+# The following items should be placed in close proximity to each other;
+
+# Bacon & Pancakes
+# Eggs & Blue berries
+# Strong Cheese & Milk
+# Escalope, Mushroom Cream Sauce & Pasta
+# Whole milk, cake and meatballs
+# Sale of burgers, milk, salmons & spaghetti
+# Mineral water should be strategically placed along most aisles if not all.
+```
+
+

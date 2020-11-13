@@ -1,0 +1,456 @@
+---
+title: "Carrefour Kenya Marketing Strategies Part 1"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Business Understanding
+
+As a Data analyst at Carrefour Kenya, I undertook a Data Science Project to inform the marketing department on the most relevant marketing strategies that will result in the highest no. of sales (total price including tax). My project has been divided into four parts where I'll explore a recent marketing dataset by performing various unsupervised learning techniques and later providing recommendations based on my insights.
+
+## Data Understanding
+
+```{r}
+# Loading the necessary libraries for loading data, cleaning, plotting and visualising results from Dimensionality Reduction
+
+pacman :: p_load(rio,dplyr, tidyverse,plotly, rmarkdown, tidyr, psych, corrplot, Amelia, usethis, devtools,ggbiplot)
+```
+
+```{r}
+# Loading our dataset and previewing first 10 records.
+
+data <- import("~/R/Unsupervised Learning Week 14 IP/Supermarket_Dataset_1 - Sales Data.csv")
+head(data,10)
+```
+
+``` {r}
+# Checking the size and shape of data
+dim(data)
+```
+``` {r}
+# Viewing data types using str().
+
+str(data)
+```
+## Data Preparation
+
+``` {r}
+# Checking for missing data in our data
+
+missmap(data)
+```
+
+``` {r}
+# Checking for duplicated records
+
+duplicated_rows <- data[duplicated(data),]  
+duplicated_rows # No duplicates in our data
+```
+``` {r}
+# Renaming long column names and changing all column names to lowercase
+
+# Renaming columns with long names
+names(data)[names(data) == "Invoice ID"] <- "invoice"
+names(data)[names(data) == "Customer type"] <- "cust_type"
+names(data)[names(data) == "Product line"] <- "product_line"
+names(data)[names(data) == "Unit price"] <- "unit_price"
+names(data)[names(data) == "gross margin percentage"] <- "gross_margin_percentage"
+names(data)[names(data) == "gross income"] <- "gross_income"
+
+# Converting all column names to lowercase
+names(data)[1:16] <- tolower(names(data)[1:16])
+```
+``` {r}
+# new column names
+colnames(data)
+```
+
+
+``` {r}
+# Factorising categorical columns branch, cust_type, gender, product_line and payment
+
+data[,c(2:5,11)] <- lapply(data[,c(2:5,11)], factor)
+str(data)
+```
+``` {r}
+# Converting date and time features to datetime
+
+data$date <- as.POSIXct(data$date, "%m-%d-%Y",tz = "GMT")
+data$time <- as.POSIXct(data$time, "%H:%M",tz = "GMT")
+```
+
+``` {r}
+# Retrieving the day only and converting to Factor
+data$date <- format(data$date, "%d")
+data$date <- as.factor(data$date)
+str(data)
+```
+
+``` {r}
+# Retrieving the hour only and converting to Factor
+data$time <- format(data$time, "%H")
+data$time <- as.factor(data$time)
+str(data)
+```
+
+``` {r}
+# Checking for Anomalies in the the Factor levels using levels() function
+
+levels(data$branch)
+levels(data$cust_type)
+levels(data$gender)
+levels(data$product_line)
+levels(data$payment)
+```
+
+``` {r}
+# Checking for Outliers in numerical columns using boxplot
+
+boxplot(data[,c(6:8,12:16)]) # Summary statistics will tell us if these points are outliers
+```
+``` {r}
+# Storing data into data2 and data3 for use in Feature Selection
+
+data2 <- data
+data3 <- data
+```
+## Exploratory Data Analysis (Univariate, Bivariate & Multivariate)
+
+# Univariate
+```{r}
+summary(data)
+
+# From our summary statistics, the max values of tax, cogs, gross_income and total are 49.65,993.0, 49.65 and 1042.65 respectively. This indicates they are not outliers since a client may have bought a large quantity of items.
+```
+```{r}
+# Frequency tables
+
+# Obtaining a table of product_line and the sum of all numerical variables
+
+prod_line_info <- data %>% 
+          group_by(product_line) %>% summarise_at(vars(quantity,tax,cogs,gross_margin_percentage,gross_income,total),funs(sum(.,na.rm=TRUE)))
+
+# Ordering the data in ascending order of gross income by product line 
+
+prod_line_info2 <- prod_line_info[with(prod_line_info,order(gross_income)), ]
+prod_line_info2
+```
+```{r}
+# From the frequency table above, its clear that Food and Beverages brings the highest total sales and gross_income inclusive of tax
+
+```
+```{r}
+# Product Line by Average Rating
+prod_line_rating <- data %>% 
+          group_by(product_line) %>% summarise_at(vars(unit_price,rating),funs(mean(.,na.rm=TRUE)))
+prod_line_rating
+```
+```{r}
+# Food and Beverages has highest ratings and Fashion and Accessories has the highest unit price
+```
+
+```{r}
+# Getting the best performing branch
+branch_info <- data %>% 
+          group_by(branch) %>% summarise_at(vars(total),funs(sum(.,na.rm=TRUE)))
+branch_info
+
+# Branch C is the best performing branch
+```
+```{r}
+# Grouping Customer Type by Total Sales
+
+customer_info <- data %>% 
+          group_by(cust_type) %>% summarise_at(vars(total),funs(sum(.,na.rm=TRUE)))
+customer_info
+
+# Normal and Member Customers are roughly the same
+```
+
+```{r}
+# Barplots
+par(mar=c(3, 10, 3, 1))
+product_barplot <- table(data$product_line)
+barplot(product_barplot,las=1, horiz=TRUE,col=rainbow(length(unique(data$product_line))))
+```
+```{r}
+# The barplot above suggests that there are more customers for Fashion Accessories followed by customers for Food & Beverages
+```
+
+```{r}
+# Barplots
+par(mar=c(3, 10, 3, 1))
+payment_barplot <- table(data$payment)
+
+barplot(payment_barplot,las=1, horiz=TRUE,col=rainbow(length(unique(data$payment))))
+```
+```{r}
+# The barplot above suggests that most customers pay in cash or e wallets. Credit card customers should be target marketed to increase sales.
+```
+
+```{r}
+# Histograms 
+
+# Distribution of Tax
+hist(data$tax,
+        main = "Distribution of Tax(Benford's Law)",
+        xlab = "Tax",
+        ylab = "Frequency")
+```
+```{r}
+# Histograms 
+
+# Distribution of Total Sales inclusive of Tax
+hist(data$tax,
+        main = "Total Sales(Benford's Law)",
+        xlab = "Total Sales",
+        ylab = "Frequency")
+```
+```{r}
+# Histograms 
+
+# Distribution of Gross Income
+hist(data$tax,
+        main = "Gross Income(Benford's Law)",
+        xlab = "Gross Income",
+        ylab = "Frequency")
+```
+```{r}
+# The three graphs above are similar (but with slight differences) to Benford's Law Distribution of anomalous numbers in real life numerical data, suggesting that there are no cases of fraud in Tax payments, Sales and Gross Income at Carrefour
+```
+
+# Bivariate
+```{r}
+# Combined Bar Charts
+
+# Using geom_bar() to plot a combined bar chart for product line and gender
+
+c <- ggplot(data, aes(x=product_line, fill=gender, color=gender)) +
+geom_bar() + labs(title="Product Line By Gender")
+
+# Making the plot horizontal
+c + coord_flip()
+
+```
+```{r}
+# The bars above suggest that there are more males who buy Health and Beauty products than females
+# More women buy Fashion and Accessories than men.
+# The other products have relatively equal numbers of men and women.
+
+# Carrefour should therefore collect more data and investigate further, which Health and Beauty Products are most sought after by men and also add Health and Beauty Products to attract more women in this line and boost sales
+```
+
+```{r}
+# Combined Bar Charts
+
+# Using geom_bar() to plot a combined bar chart for product line and branch
+
+c <- ggplot(data, aes(x=product_line, fill=branch, color=branch)) +
+geom_bar() + labs(title="Product Line By Branch")
+
+# Making the plot horizontal
+c + coord_flip()
+
+```
+```{r}
+# Branch B is performing poorly in terms of Food & Beverages and Home & Lifestyle products. The marketing department should probably increase diversity and quality  of both product lines to boost sales in Branch B.
+
+# Generally, Branch B customers should be targeted with marketing strategies in all product lines to increase overal sales for Carrefour
+```
+
+```{r}
+# Correlation Matrix
+# computing a correlation matrix between all numerical variables using pearson method
+
+# Dropping gross_margin_percentage because its constant because its std dev and variance will be zero and cannot be divided by zero when getting correlations
+all_num_vars <- data[,c(6:8,12,14:15)]
+
+
+correlations <- cor(all_num_vars, method = "pearson")
+round(correlations, 2)
+```
+```{r}
+# Viewing the correlations better to support the above figures
+
+corrplot(correlations, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+```
+
+```{r}
+# The correlation matrix and corr plot reveal that there's a strong relationship between 
+# quantity and gross_income(0.71), tax(0.71),cogs(0.71)
+# unit_price and gross_income(0.63), tax(0.63),cogs(0.63)
+# Thus there's presence of multi-collinearity in our dataset features because gross_income, tax and cogs have a perfect linear relationship of 1 with each other
+```
+
+```{r}
+# Scatterplots
+
+# Setting graph dimensions
+options(repr.plot.width = 13, repr.plot.height = 7)
+
+# Plotting scatter plot of gross_income vs Cogs using ggplot() and using theme() for theme of the plot 
+
+income_cogs = ggplot(data = data, aes(x = gross_income, y = cogs , col = branch)) + 
+    geom_point() + 
+    labs(title = 'Relationship Between Gross Income & Cogs', x = 'Gross Income', y = 'Cogs') + 
+    scale_color_brewer(palette = 'Set2') +
+    theme()
+        
+plot(income_cogs)
+
+```
+```{r}
+# Scatterplots
+
+# Setting graph dimensions
+options(repr.plot.width = 13, repr.plot.height = 7)
+
+# Plotting scatter plot of unit_price vs Cogs using ggplot() and using theme() for theme of the plot 
+
+income_cogs = ggplot(data = data, aes(x = unit_price, y = cogs , col = branch)) + 
+    geom_point() + 
+    labs(title = 'Relationship Between Unit Price & Cogs', x = 'Unit Price', y = 'Cogs') + 
+    scale_color_brewer(palette = 'Set2') +
+    theme()
+        
+plot(income_cogs)
+
+```
+
+
+```{r}
+# From the Bivariate Analysis, it is clear that theres perfect multi-collinearity between gross_income, tax and cogs. For that matter, we'll only retain one variable which is gross_income.
+```
+
+
+```{r}
+# Total Sales by Hour
+hourly_total <- data %>% 
+          group_by(time) %>% summarise_at(vars(total),funs(mean(.,na.rm=TRUE)))
+
+# time series line plot
+
+time_series = ggplot(data = hourly_total, aes(x = time, y = total, group = 3))+
+  geom_line(color = "#00AFBB", size = 2) + labs(title = 'Peak Shopping Hours', x = 'Hour of Day', y = 'Total Sales(Inclusive of Tax)') +
+    theme(plot.title=element_text(size=18, face="bold", color="navyblue",hjust=0.5, lineheight=1.2), 
+          plot.subtitle=element_text(size=15, face="bold", hjust=0.5),
+         axis.title.x = element_text(color = 'navyblue', size = 13, face = 'bold', vjust = -0.5),
+         axis.title.y = element_text(color = 'navyblue', size = 13, face = 'bold', vjust = 0.5),
+         axis.text.y = element_text(size = 13),
+         axis.text.x = element_text(size = 13),
+         legend.title = element_text(size = 13, color = 'navyblue'),
+        legend.text = element_text(size = 11))
+plot(time_series)
+```
+```{r}
+# Peak SHopping Hours to target customers with new marketing campaings or promotions are 11:00, 14:00, 17:00 and 19:00 Hours
+```
+
+# Multivariate 
+# Part 1: Dimensionality Reduction using PCA
+
+```{r}
+
+# Previewing previously selected the numerical data excluding categorical variables
+
+# We do not include total because thats our predictor variable
+head((data[,c(6:8,12,14:15)]))
+```
+
+```{r}
+# We then pass all_num_vars to the prcomp() function. We also set two arguments, center and scale, 
+
+data.pca <- prcomp(data[,c(6:8,12,14:15)], center = TRUE, scale. = TRUE)
+summary(data.pca)
+```
+
+```{r}
+# From the summary above, we obtain 7 Principal components and PC1 explains 65.45% of the total variance
+# This means 65.45% of the total information in the dataset is encapsulated by the first Pricipal Component
+# PC2 and PC3 explain 16.67% and 16.46% of the total variance/information in the dataset.
+
+# PC5 to PC6 are irrelevant and dont explain anything about our data since their proportions of variance are zero.
+```
+
+```{r}
+# Taking a look at out PCA object to see the standard deviations, rotation, centers and values of samples in terms of principal components
+str(data.pca)
+```
+
+```{r}
+# Visualising the results of our PCA Analysis grouped by branches
+# NB, ggbiplot, usethis and devtools were already loaded using pacman in the cell for previewing our data
+
+ggbiplot(data.pca ,groups=data$branch) 
+
+# we cant add more detail such as labels since the graph is already congested.
+```
+
+```{r}
+# From the graph we will see that the variables unit_price,quantity and gross_income contribute to PC1 and are significant for use in modelling.
+```
+
+# Part 2: Feature Selection
+```{r}
+# In this section, we'll use Embedded Methods and filter methods to see if we'll obtain similar results.
+```
+# Filter Methods
+```{r}
+# Loading neccesary libraries for filter methods and feature ranking
+pacman :: p_load(caret,wskm,cluster)
+
+# Calculating correlation matrix for numerical variables
+all_num_vars2 <- data2[,c(6:8,12,14:16)]
+correlations2 <- cor(all_num_vars2)
+
+# Finding highly correlated attributes with a cut off correlation coefficient of 0.6
+high_corr <- findCorrelation(correlations2, cutoff=0.6)
+
+# Getting the names of highly correlated features
+names(all_num_vars2[,high_corr])
+```
+
+```{r}
+# Results above indicate highly correlated features obtained are the same as those obtained from Bivariate Analysis previously.
+```
+
+```{r}
+# Removing highly correlated features and comparing the correlation plots graphically
+
+data2.5<-all_num_vars2[-high_corr]
+
+# Graphical comparison
+
+par(mfrow = c(1, 2))
+corrplot(correlations2, order = "hclust")
+corrplot(cor(data2.5), order = "hclust")
+
+# The resulting graph on the bottom right indicates no perfect multicollinearity
+```
+## P1 Insights
+
+```{r}
+# Best performing Branch is C
+# Roughly equal number of normal & member customers at Carrefour
+# There're more customers for Fashion and Accessories followed by those for Food & Beverages
+# Most customers pay in cash or ewallet. Credit card customers should be target marketed.
+# Seems to be no anomalies in distribution of sales, gross income and tax at Carrefour
+# There're more men than women who buy Health & Beauty Products
+# More women than men buy Fashion & Accessories
+# Branch B performs poorly in Food & Beverages, Home & Lifestyle products. Marketing Department should look into this
+# Cogs, tax and gross income features are perfectly correlated, hence only one was retained, gross income.
+# Peak shopping hours for max sales are 11:00, 14:00, 17:00 and 19:00 hours. Marketing Department should carry out promotions during these hours
+# Unit price, quantity, and gross income are features that contribute the most information about the dataset and should be used for modelling.
+```
+
+## P2 Insights
+```{r}
+# cogs, tax and gross income are perfectly correlated. Dimensionality reduction by Feature selection reduces the features to the same final number of features obtained in part 1 by removing cases of multi-collinearity (cogs, tax) and goes on to remove the gross income feature as well.
+```
+
+
+
+
